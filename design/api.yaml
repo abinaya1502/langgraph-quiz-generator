@@ -1,0 +1,183 @@
+openapi: 3.0.3
+info:
+  title: Quizz agent - API
+  description:
+    Agent that produce quizz and answer for the question, review and give feedback
+  version: 1.0.0
+  contact:
+   name: Agent - Support
+   email: support@agent.com
+servers:
+ - url: http://localhost:8080
+   description: local server
+
+tags:
+ - name: Quiz Agent
+   description: Operations related to reply the responce given by the user query
+paths:
+
+  /api/v1/quiz-agent:
+    post:
+      tags: [Agent]
+      summary: Response of the user query
+      description: Response back with feedback for the answer given by the user
+      requestBody:
+        required: true
+        description: user query
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QuizAgentRequest'
+      responses:
+        '200':
+          description: response for the user query
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+              example:
+                code_generator:
+                    status_code: 201
+                    message: "success"
+                    data:
+                      correct_count:
+                      example: 4
+                    wrong_count:
+                      example: 1
+                    grade:
+                      example: C
+                    wrong_explantion:
+                        $ref: '#/components/schemas/WrongAnswerExplanation'
+                    feedback:
+                      example: Great effort on your quiz! Remember to review the explanations for the questions you got wrong to understand the correct usage. Keep practicing!
+                    thread_id:
+
+                      example: 90dc0643-bfac-46bc-a49a-f88a99d9b386r
+
+                    errors: []
+                    request_id: "77107285-964d-4a24-8760-d496f70c22a3"
+        '422':
+          description: Bad request — missing or invalid fields
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                status_code: 422
+                status: "Error"
+                message: "Validation failed"
+                errors:
+                  -
+                    code: ValidationErrorCode
+                    message: "Validation failed"
+
+                request_id: "77107285-964d-4a24-8760-d496f70c22a3"
+
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+
+                errors:
+                  - code: InternalServerErrorCode
+                    message: "Internal server error"
+                status_code: 500
+                request_id: "77107285-964d-4a24-8760-d496f70c22a3"
+                message: "Internal server error"
+
+components:
+  schemas:
+    APIResponse:
+      type: object
+      description: Response that returned to the client
+      properties:
+        data:
+          $ref: '#/components/schemas/ReviewAgentResponse'
+        errors:
+          type: array
+          description: List of errors
+          items:
+            $ref: '#/components/schemas/Error'
+        request_id:
+          type: string
+          description: auto generated uuid
+          example: 11111-11111111-1111111-111
+        status_code:
+          type: integer
+          description: HTTP status code
+          example: 200
+        message:
+          type: string
+          description: Human-readable message
+          example: success
+
+    QuizAgentRequest:
+      type: object
+      properties:
+        user_id:
+          type: string
+          example: 11111-1111-111-111111
+        concept:
+          type: string
+          example: SQL
+        level:
+          type: string
+          example: advance
+        no_of_question:
+          type: integer
+          example: 5
+
+    ReviewAgentResponse:
+      type: object
+      properties:
+        correct_count:
+          type: integer
+          example: 4
+        wrong_count:
+          type: integer
+          example: 1
+        grade:
+          type: string
+          example: C
+        wrong_explantion:
+
+            $ref: '#/components/schemas/WrongAnswerExplanation'
+        feedback:
+          type: string
+          example: Great effort on your quiz! Remember to review the explanations for the questions you got wrong to understand the correct usage. Keep practicing!
+        thread_id:
+          type: string
+          example: 90dc0643-bfac-46bc-a49a-f88a99d9b386
+
+    WrongAnswerExplanation:
+      type: object
+      properties:
+        question:
+          type: string
+          example: Q1,what command is used to retrive the data
+        user_answer:
+          type: string
+          example: C
+        correct_answer:
+          type: string
+          example: D
+
+        explanation:
+          type: string
+          example: The correct sentence is D. The subjunctive mood is used to express wishes, hypothetical situations, or conditions contrary to fact.
+
+    Error:
+      type: object
+      description: Standard error response structure
+      properties:
+        code:
+          type: string
+          description: Strucure code for errors
+          example: InternalServerErrorCode
+        message:
+          type: string
+          description: Human-readable error message
+          example: Message according to each Error

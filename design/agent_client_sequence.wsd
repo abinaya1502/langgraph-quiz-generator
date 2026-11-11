@@ -1,0 +1,584 @@
+@startuml sequence_diagram
+autonumber 1.0
+
+actor Client
+participant "src/app.py" as App
+participant "src/models/request_dto.py" as AgentRequest
+participant "src/router/agent_routes.py" as Router
+participant "src/services/agent_service.py" as Service
+participant "src/utils/guardrils.py" as Guardrils
+participant "src/agents/main_agent.py" as MainAgent
+participant "src/agents/main_prompt.py" as MainSystemPrompt
+participant "src/agents/state.py" as State
+participant "src/agents/middleware.py" as Middleware
+participant "src/agents/quiz_run_agent.py" as QuizAgent
+participant "src/agents/review_run_agent.py" as ReviewAgent
+participant "src/tools/quiz_agent.py" as QuizAgentTool
+participant "src/tools/quiz_prompt.py" as QuizSystemPrompt
+participant "src/tools/review_agent.py" as ReviewAgentTool
+participant "src/tools/review_prompt.py" as ReviewSystemPrompt
+Participant "src/utils/llm_client.py" as Llm
+Participant "src/utils/bedrock_client.py" as Bedrock
+
+
+
+note over App
+**App Imports**
+from numpy import outer
+import uvicorn
+from contextlib import asynccontextmanager
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from routes.router import routerapi
+from routes.coder_agent_router import router
+from models.custome_app_exepction import CustomAppException
+from utils.errors.http_status import HttpStatusCode
+from models.api_response_dto import APIResponse, Error
+from utils.errors.error_codes import ErrorCode, ErrorCodeStatus
+from migrations.migration import Migration
+end note
+
+
+note over Router
+**Router Imports**
+from fastapi import APIRouter
+from models.api_response_dto import APIResponse
+from models.request_dto import QuizAgentRequest
+from services.agent_service import AgentService
+from utils.errors.error_log import log_error
+from utils.errors.http_status import HttpStatusCode
+from models.custome_app_exepction import CustomAppException
+from utils.errors.error_codes import ErrorCode
+from utils.logger import get_logger
+end note
+
+note over Service
+**Service Imports**
+import uuid
+from agents.main_agent import MainAgent
+from setting import config
+from langgraph.types import Command
+from models.request_dto import QuizAgentRequest
+from utils.errors.error_log import log_error
+from utils.errors.http_status import HttpStatusCode
+from models.custome_app_exepction import CustomAppException
+from utils.errors.error_codes import ErrorCode
+from utils.llm_client import Llm
+
+from utils.logger import get_logger
+end note
+
+note over ErrorCodes
+  **Error Codes**
+  class ErrorCode:
+      USER_NOT_FOUND = "UserNotFoundErrorCode"
+      DATABASE_ERROR = "DatabaseErrorErrorCode"
+      INTERNAL_SERVER_ERROR = "InternalServerErrorCode"
+      VALIDATION_ERROR = "ValidationErrorCode"
+end note
+
+note over MainAgent
+**main agent**
+    from langchain.agents import create_agent
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+from langchain_core.messages import HumanMessage, SystemMessage
+from agents.main_prompt import MainSystemPrompt
+from agents.middleware import route_by_step
+from agents.state import AgentState
+from models.custome_app_exepction import CustomAppException
+from models.request_dto import QuizAgentRequest, ReviewAgentResponse
+from utils.errors.error_codes import ErrorCode
+from utils.errors.error_log import log_error
+from utils.errors.http_status import HttpStatusCode
+from utils.llm_client import Llm
+from utils.logger import get_logger
+from tools.quiz_agent import quiz_agent
+from tools.review_agent import review_agent
+from setting import config
+
+end note
+
+note over QuizAgentTool
+**quiz agent tool**
+from typing import Annotated
+from langchain.tools import InjectedToolCallId, tool
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+from langgraph.types import Command
+from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
+from agents.quiz_run_agent import quiz_run_agent
+from models.request_dto import QuizAgentResponse
+from tools.quiz_prompt import QuizSystemPrompt
+from models.custome_app_exepction import CustomAppException
+from utils.errors.error_codes import ErrorCode
+from utils.errors.error_log import log_error
+from utils.errors.http_status import HttpStatusCode
+from utils.llm_client import Llm
+from utils.logger import get_logger
+from setting import config
+end note
+
+note over ReviewAgentTool
+**review agent tool**
+from typing import Annotated
+from langgraph.types import Command
+from langgraph.graph import END
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+from langchain.tools import InjectedState, InjectedToolCallId, tool
+from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
+from agents.review_run_agent import review_run_agent
+from tools.review_prompt import ReviewSystemPrompt
+from models.custome_app_exepction import CustomAppException
+from models.request_dto import ReviewAgentResponse, ReviewAgentRequest, QuizQuestion
+from utils.errors.error_codes import ErrorCode
+from utils.errors.error_log import log_error
+from utils.errors.http_status import HttpStatusCode
+from utils.llm_client import Llm
+from utils.logger import get_logger
+from setting import config
+end note
+
+note over QuizAgent
+**quiz agent**
+
+from langchain.agents import create_agent
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
+from models.request_dto import QuizAgentResponse
+from models.custome_app_exepction import CustomAppException
+from utils.errors.error_codes import ErrorCode
+from utils.errors.error_log import log_error
+from utils.errors.http_status import HttpStatusCode
+from utils.llm_client import Llm
+from utils.logger import get_logger
+from setting import config
+
+end note
+
+note over ReviewAgent
+**review agent**
+
+from langchain.agents import create_agent
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
+from models.request_dto import QuizAgentResponse
+from models.custome_app_exepction import CustomAppException
+from utils.errors.error_codes import ErrorCode
+from utils.errors.error_log import log_error
+from utils.errors.http_status import HttpStatusCode
+from utils.llm_client import Llm
+from utils.logger import get_logger
+from setting import config
+end note
+
+note over HttpStatus
+  **HTTP Status Codes**
+  class HttpStatusCode:
+      OK = 200
+      CREATED = 201
+      BAD_REQUEST = 400
+      NOT_FOUND = 404
+      UNPROCESSABLE_ENTITY = 422
+      INTERNAL_SERVER_ERROR = 500
+end note
+
+Client -> App: POST/api/v1/quiz-agent{request_body: user_id,concept,level,no_of_question}
+activate  App
+group App
+'end
+   App -> App : create instance for FastAPI by calling FastAPI Method and store it in variable app
+   App -> App : sets the accessibility for the origins, headers, methods to public using add_middleware available in app variable
+   App -> App : include the Router by calling app.include_router(Apirouter)
+
+    App -> App: cart creation endpoint function triggered which is mapped to route /api/v1/coder-agent
+    App -> Router: agent_router(request: QuizAgentRequest)
+
+activate Router
+   group function coder_agent_router()
+   Router -> Router: The agent_router() is getting triggered - FastAPI matches HTTP post and routes to the path
+            group PydanticValidation Try Block
+                    alt PydanticValidation Success
+                    Router -> AgentRequest : The required fields to build a agentic bot  is validated using pydantic validation
+                    AgentRequest -> Router : QuizAgentRequest class validated the fields and returns the fields
+                    end
+                    else PydanticValidation Failed
+                        AgentRequest -> Router : The exception is raised when the validation is failed in AgentRequest class
+                        group PydanticValidation Catch Exception
+                            note over Router
+                                **PydanticValidation Exception Handler**
+                                except Exception as e:
+                                    raise CustomAppException(
+                                    message assign f"query:Field required: {str(e)}",
+                                    code assign ErrorCode.VALIDATION_ERROR,
+                                    status_code assign HttpStatusCode.VALIDATION_ERROR,
+                                )
+                            end note
+                        end
+            end
+
+
+    group agent_router() try
+
+        Router -> Router:  Create AgentService instance and stored in the variable service
+        Router -> Router: agent_router(request:QuizAgentRequest)
+        Router -> Service: service.agent_service(request)
+        Router -> Service: Created a method called agent_service() method is tiggered, the request data is received as input
+        activate Service
+        group agent_service()
+
+        Service -> Service: Create MainAgent instance and stored in the variable agent
+        group agent_service() try
+
+            Service -> Service: agent_service(request: QuizAgentRequest)
+            Service -> Service: it call t he llm_guardrils funtion to handle the unknown secnario before roting to main agent
+            Service -> Guardrils : decision = llm_guardrils(user_query )
+            activate Guardrils
+            group llm_guardrils
+            Guardrils -> Guardrils : llm_guardrils function is triggerd and unknow scenorio is handle  using llm innvolation and return the response ith GuadrilsResponse format which has the continue and message
+            Guardrils --> Service: return the continue , message feild
+            end
+
+            deactivate Guardrils
+
+
+            Service -> Service : it check whether the continue is false or true , if its true it follows the previous routing , else it will return the return message from the llm invokation
+            Service -> Service: agent.main_agent(request)
+
+            Service -> MainAgent: Created a method called Main_agent() and triggered, the request data is received as input
+            activate MainAgent
+            group main_agent()
+            'end
+                MainAgent -> MainAgent: The instance is created for the systemprompt and llm  for the llm invocation
+                MainAgent -> MainAgent: self.prompt = MainSystemPrompt , self.llm = Llm()
+
+                group MainAgent() try
+
+                MainAgent -> MainAgent: varaible llm_client, system_prompt is created and the get_llm() and get_system_prompt() function is called respectively
+                MainAgent -> Llm
+                                Llm -> Llm : The instance is created for the bedrock
+                                group function get_llm()
+                                activate Llm
+                                Llm -> Llm : using ChatBedrock the client is created and used all over and get_bedrock_client is called
+                                Llm -> Bedrock: get_bedrock_client is called and storend in the varaible client
+
+                                    group function get_bedrock_client()
+                                    activate Bedrock
+                                    Bedrock -> Bedrock:bot3 client is created using the service name , region_name , aws_access_key_id, aws_secret_access_key
+
+                                    end
+                                    Bedrock --> Llm: return the client
+                                    deactivate Bedrock
+                                end
+                                Llm --> MainAgent: return the llm client and stored in the llm_client variable
+                                deactivate Llm
+                            MainAgent -> MainAgent: Create variable system_prompt and prompt.get_system_prompt() is called
+                            MainAgent -> MainSystemPrompt: get_system_prompt is triggered
+                                activate MainSystemPrompt
+                                group genertor function get_system_prompt()
+                                MainSystemPrompt -> MainSystemPrompt : When get_system_prompt() method is triggered where system prompt is defined
+                                MainSystemPrompt -> MainSystemPrompt : The systemprompt is stored in the variable system_prompt and it is returned to main_agent() method
+
+                                end
+
+                                MainSystemPrompt --> MainAgent: return the system prompt and store it in the created varaiable
+                                deactivate MainSystemPrompt
+                MainAgent -> MainAgent : Created a AsyncPostgresSaver with function and configured with db and kept as checkpointer
+                MainAgent -> MainAgent : Using checkpointer.setup() function it automatically create a new table if table not exsits to store the thread id generated
+                MainAgent -> MainAgent : The created instance is stored in the variable agent
+                MainAgent -> MainAgent : The create_agent inbuilt function is called with parameter of the , tools , checkpointer, State_schema , response_format, middleware
+                MainAgent -> MainAgent : Two tool is defined , where they are two agent as tools quiz_agent , review_agent
+                MainAgent -> QuizAgentTool :  quiz_agent is defined in the key tools and now quiz_agent tool is tiggerd
+                activate QuizAgentTool
+
+                group quiz_agent()
+
+                    QuizAgentTool -> QuizAgentTool : The db uri is setted here to use the checkpointer
+                    QuizAgentTool -> QuizAgentTool : Created a instance prompt to fetch the QuizAgent system prompt
+                    group quiz_agent() try
+                        QuizAgentTool -> QuizSystemPrompt : Created a variable system_prompt get the prompt using prompt.get_system_prompt
+                        activate QuizSystemPrompt
+                        group genertor function get_system_prompt()
+                            QuizSystemPrompt -> QuizSystemPrompt : When get_system_prompt() method is triggered where system prompt is defined
+                            QuizSystemPrompt -> QuizSystemPrompt : The systemprompt is stored in the variable system_prompt and it is returned to quiz_agent() method
+
+                        end
+
+                        QuizSystemPrompt --> QuizAgentTool: return the system prompt and store it in the created varaiable
+                        deactivate QuizSystemPrompt
+                        QuizAgentTool -> QuizAgentTool : Created a AsyncPostgresSaver with function and configured with db and kept as checkpointer
+                        QuizAgentTool -> QuizAgentTool : Using checkpointer.setup() function it automatically create a new table if table not exsits to store the thread id generated
+                        QuizAgentTool -> QuizAgentTool : The created instance is stored in the variable agent
+                        QuizAgentTool -> QuizAgent : Call the quiz_run_agent which has the create_agent functionality and pass the chechpointer as parameter
+                        group quiz_run_agent()
+                            QuizAgent -> QuizAgent : Insatnce is create with the name llm for the class Llm()
+                            QuizAgent -> Llm : refer 1.22 to 1.26
+                            QuizAgent -> QuizAgent : The create_agent inbuilt function is called with parameter of the  , checkpointer, response_format = QuizAgentResponse
+                            QuizAgent -> QuizAgent : Return   agent
+                        end
+
+                        QuizAgentTool -> QuizAgentTool: The variable messages is created and stores the system message and  humman message
+                        QuizAgentTool -> QuizAgentTool : The variable result is created and invoking the agent is done by giving the message and congifurable with thread id
+                        QuizAgentTool -> QuizAgentTool : The invoked response is stored in the variable result
+                        QuizAgentTool -> QuizAgentTool : The quiz agent will generates the quizz and stored in the result
+                        QuizAgentTool -> QuizAgentTool : Structure the response using the QuizAgentResponse format where it has the questions: List[QuizQuestion]
+                        QuizAgentTool -> QuizAgentTool : Created a variable user_answer to store the list of answers given from the user
+                        QuizAgentTool -> QuizAgentTool : using for loop print question which store in the result one by one and get the user answer accordingly and append the option enterd by the user in the varaiable user_answer
+                        QuizAgentTool --> ReviewAgentTool : return as the command update the state and using handoff concept move to the reviewerAgent
+                        end
+
+                    group function quiz_agent() Execption
+
+                        QuizAgentTool -> Service : Raise a CustomAppException indicating a agent error occurred fetchin the response, using the internal server error code, HTTP 500, and the corresponding error_code_id
+                        QuizAgentTool -->Service  : Propagate the newly raised CustomAppException to the service
+                        Service -> Router: Raise a CustomAppException indicating a service error occurred fetchin the response, using the internal server error code, HTTP 500, and the corresponding error_code_id
+                        Service --> Router:ropagate the newly raised CustomAppException to the router
+                        Router -> Client: Raise a CustomAppException indicating a Router error occurred fetchin the response, using the internal server error code, HTTP 500, and the corresponding error_code_id
+                        Router --> Client:ropagate the newly raised CustomAppException to the client
+
+
+                            note over QuizAgentTool, Service
+                            Error Response (500 propagated):
+                            {
+                                "data": null,
+                                "errors": [{
+                                "code": "InternalServerErrorCode",
+                                "message": "QUiz Agent error : unexpected error",
+
+                                }],
+                                "status_code": 500,
+                                "request_id": "cc58739f-f6dc-475f-abf8-997c357a4899",
+                                "message": " quiz agent error : unexpected error"
+                            }
+                            end note
+                        end note
+                        end
+
+                end
+                deactivate QuizAgentTool
+
+                group review_agent()
+
+
+                    ReviewAgentTool -> ReviewAgentTool: The db uri is setted here to use the checkpointer
+                    ReviewAgentTool -> ReviewAgentTool : The instance prompt is created for the class ReviewSystemPrompt
+
+                    group review_agent() try
+                    activate ReviewAgentTool
+                    ReviewAgentTool -> ReviewAgentTool : get the reviewGentRequest dtos from the state and format the the response which from the quizz agent
+                    ReviewAgentTool -> ReviewSystemPrompt: Created a variable system_prompt get the prompt using prompt.get_system_prompt
+                    activate ReviewSystemPrompt
+                        group genertor function get_system_prompt()
+                        ReviewSystemPrompt -> ReviewSystemPrompt : When get_system_prompt() method is triggered where system prompt is defined
+                        ReviewSystemPrompt -> ReviewSystemPrompt : The systemprompt is stored in the variable system_prompt and it is returned to review() method
+
+                        end
+
+                        ReviewSystemPrompt --> ReviewAgentTool: return the system prompt and store it in the created varaiable
+                    deactivate ReviewSystemPrompt
+                    ReviewAgentTool -> ReviewAgentTool : Created a AsyncPostgresSaver with function and configured with db and kept as checkpointer
+                    ReviewAgentTool -> ReviewAgentTool : Using checkpointer.setup() function it automatically create a new table if table not exsits to store the thread id generated
+                    ReviewAgentTool -> ReviewAgentTool : The created instance is stored in the variable agent
+                    ReviewAgentTool -> ReviewAgentTool : Call the quiz_run_agent which has the create_agent functionality and pass the chechpointer as parameter
+                        group review_run_agent()
+                            ReviewAgent -> ReviewAgent : Insatnce is create with the name llm for the class Llm()
+                             QuizAgent -> Llm : refer 1.22 to 1.26
+                            ReviewAgent -> ReviewAgent : The create_agent inbuilt function is called with parameter of the  , checkpointer, response_format = ReviewResponse
+                            ReviewAgent -> ReviewAgent : Return the agent
+                        end
+
+                    ReviewAgentTool -> ReviewAgentTool: The variable messages is created and stores the system message and  humman message
+                    ReviewAgentTool -> ReviewAgentTool : The variable result is created and invoking the agent is done by giving the message and congifurable with thread id
+                    ReviewAgentTool -> ReviewAgentTool : The invoked response is stored in the variable result
+                    ReviewAgentTool -> ReviewAgentTool : Review the question answer given by the quiz angent return response in the given formated response
+                    ReviewAgentTool --> MainAgent : using commond return the main agent by changeing the current_step to "done" which mean the proccess is done
+                    end
+
+                    group function review_agent() Execption
+
+                        ReviewAgentTool -> Service : Raise a CustomAppException indicating a agent error occurred fetchin the response, using the internal server error code, HTTP 500, and the corresponding error_code_id
+                        ReviewAgentTool -->Service  : Propagate the newly raised CustomAppException to the service
+                        Service -> Router: Raise a CustomAppException indicating a service error occurred fetchin the response, using the internal server error code, HTTP 500, and the corresponding error_code_id
+                        Service --> Router:ropagate the newly raised CustomAppException to the router
+                        Router -> Client: Raise a CustomAppException indicating a Router error occurred fetchin the response, using the internal server error code, HTTP 500, and the corresponding error_code_id
+                        Router --> Client:ropagate the newly raised CustomAppException to the client
+
+
+                            note over ReviewAgentTool, Service
+                            Error Response (500 propagated):
+                            {
+                                "data": null,
+                                "errors": [{
+                                "code": "InternalServerErrorCode",
+                                "message": "Review Agent error : unexpected error",
+
+                                }],
+                                "status_code": 500,
+                                "request_id": "cc58739f-f6dc-475f-abf8-997c357a4899",
+                                "message": " review agent error : unexpected error"
+                            }
+                            end note
+                        end
+                end
+                deactivate ReviewAgentTool
+                MainAgent -> MainAgent : AgentState is created and accessed all over the application
+                MainAgent -> State : state_schema is defined inside the create_agent function
+                group state
+                    State -> State : Variable current_step is created to update the one tool to another tool
+                    State -> State : Variable concept is created to  update the concept from the user input where quiz is genrated based on this concept
+                    State -> State: Variable  level is created to update the level of difficulty based on the user input like "easy","medium","advance"
+                    State -> State : Variable no_of_questions is created to update the no of questions should the response contain
+                    State -> State: Variable user_id is created to update the user_id generated in the service layer
+                    State -> State: Variable questions is created to update the question generated by the quiz agent with QuizQuestion format
+                    State -> State : Variable user_answer is created to update the user input for the  respective questions
+                end
+                MainAgent -> MainAgent: middleware is defined
+                MainAgent -> Middleware : it calls the instance rout_by_step which has the class where tool config is done
+                group Middleware
+                    Middleware -> Middleware: Declared the required tools where agent is kept as tool and stored as dict in the varaible STEP_TOOLS
+                    Middleware -> Middleware: class RouteByStepMiddleware is triggered abd has the awrap_model_call  function is called with ModelRequest and ModelResponse as arugment
+                    Middleware -> Middleware:  the variable is  current_step is created, where it help to route the agent, the quizagent as tool is called first whenever the main_agent is called
+
+                    Middleware --> Middleware: It return the response as ModelResponse
+                    Middleware -> Middleware : The instance is created route_by_step = RouteByStepMiddleware() which is used in the create_agent function
+                end
+                MainAgent -> MainAgent: The variable messages is created and stores the system message and  humman message
+                MainAgent -> MainAgent : The variable result is created and invoking the agent is done by giving the message and congifurable with thread id
+                MainAgent --> MainAgent : The invoked response is stored in the variable result and it is returned to main_agent() method
+                MainAgent --> Service : return the agent responce to th service as a formatted response using review agent dto
+                end
+                group function main_agent() Execption
+                    'execption
+                    MainAgent -> Service : Raise a CustomAppException indicating a agent error occurred fetchin the response, using the internal server error code, HTTP 500, and the corresponding error_code_id
+                    MainAgent -->Service  : Propagate the newly raised CustomAppException to the service
+                    Service -> Router: Raise a CustomAppException indicating a service error occurred fetchin the response, using the internal server error code, HTTP 500, and the corresponding error_code_id
+                    Service --> Router:ropagate the newly raised CustomAppException to the router
+                    Router -> Client: Raise a CustomAppException indicating a Router error occurred fetchin the response, using the internal server error code, HTTP 500, and the corresponding error_code_id
+                    Router --> Client:ropagate the newly raised CustomAppException to the client
+
+
+                        note over MainAgent, Service
+                        Error Response (500 propagated):
+                        {
+                            "data": null,
+                            "errors": [{
+                            "code": "InternalServerErrorCode",
+                            "message": "Main Agent error : unexpected error",
+
+                            }],
+                            "status_code": 500,
+                            "request_id": "cc58739f-f6dc-475f-abf8-997c357a4899",
+                            "message": " main agent error : unexpected error"
+                        }
+                        end note
+
+                    end
+                deactivate MainAgent
+            end
+        Service --> Router : return the response to the router layer
+        group function agent_service() Exception
+        Service -> Router: Raise a CustomAppException indicating a service error occurred fetchin the response, using the internal server error code, HTTP 500, and the corresponding error_code_id
+        Service --> Router:ropagate the newly raised CustomAppException to the router
+        Router -> Client : Raise a CustomAppException indicating a Service error occurred fetchin the response, using the internal server error code, HTTP 500, and the corresponding error_code_id
+        Router --> Client : Propagate the newly raised CustomAppException to the client
+
+            note over Service, Router
+            Error Response (500 propagated):
+            {
+                "data": null,
+                "errors": [{
+                "code": "InternalServerErrorCode",
+                "message": "Service error : unexpected error",
+
+                }],
+                "status_code": 500,
+                "request_id": "cc58739f-f6dc-475f-abf8-997c357a4899",
+                "message": "Service error : unexpected error"
+            }
+            end note
+        end
+        deactivate Service
+    end
+    Router --> App : return the reponse by wrapping them as API response
+group agent_router() Exception
+Router -> Client : Raise a CustomAppException indicating a Router error occurred fetchin the response, using the internal server error code, HTTP 500, and the corresponding error_code_id
+          Router --> Client : Propagate the newly raised CustomAppException to the client
+          note over Router, App
+          Error Response (500 propagated):
+          {
+            "data": null,
+            "errors": [{
+              "code": "InternalServerErrorCode",
+              "message": "Router error : unexpected error",
+
+            }],
+            "status_code": 500,
+            "request_id": "cc58739f-f6dc-475f-abf8-997c357a4899",
+            "message": "Router error : unexpected error"
+          }
+          end note
+
+end
+end
+deactivate Router
+
+ App -> Client: return the successfull response to the client
+        note over App, Client
+       {
+    "data": {
+         "correct_count": 3,
+        "wrong_count": 2,
+        "grade": "B",
+        "wrong_explanations": [
+            {
+                "question": "Q1",
+                "user_answer": "C",
+                "correct_answer": "D",
+                "explanation": "The correct sentence is D.
+                The subjunctive mood is used to express wishes,
+                hypothetical situations, or conditions contrary to fact."
+            },
+            {
+                "question": "Q2",
+                "user_answer": "D",
+                "correct_answer": "B",
+                "explanation": "The correct sentence is B.
+                The subjunctive mood is used after wish,
+                if only, I wish, etc."
+            },
+            {
+                "question": "Q3",
+                "user_answer": "B",
+                "correct_answer": "A",
+                "explanation": "The correct sentence is A.
+                The passive voice is used when the focus is on the action.
+                The agent performing the action may be omitted, known, or unknown."
+            },
+            {
+                "question": "Q4",
+                "user_answer": "A",
+                "correct_answer": "C",
+                "explanation": "The correct sentence is C.
+                The past perfect tense is used to describe an action that was completed before another action in the past."
+            },
+            {
+                "question": "Q5",
+                "user_answer": "B",
+                "correct_answer": "B",
+                "explanation": "Correct! The conditional perfect tense is used to describe a
+                hypothetical situation in the past that did not happen."
+            }
+        ],
+        "feedback": "Great effort on your quiz! Remember to review the explanations for the questions you got wrong to understand the correct usage. Keep practicing!",
+        "thread_id": "90dc0643-bfac-46bc-a49a-f88a99d9b386"
+    },
+    },
+    "errors": [],
+    "status_code": 200,
+    "request_id": "dde20393-72da-49aa-ab09-854959c2035e",
+    "message": "Success"
+}
+        end note
+    deactivate App
+@enduml
+

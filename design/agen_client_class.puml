@@ -1,0 +1,273 @@
+@startuml class_diagram
+skinparam classAttributeIconSize 0
+skinparam classFontSize 10
+skinparam Linetype Ortho
+
+package "Application Layer"{
+    class FastAPI <<src/app.py>> {
+        -app:FastAPI
+    }
+}
+
+package "Routes Layer" {
+    class APIRouter <<src/routes/agent_router.py>> {
+        -service : AgentService
+        +agent_router(request: QuizAgentRequest): APIResponse
+    }
+}
+
+package "Service Layer" {
+    class AgentService<<src/services/agent_service.py>> {
+        -agent: MainAgent
+        -guardrils: GuardrilsService
+        +main_agent(QuizAgentRequest)
+
+
+    }
+
+}
+
+
+
+package "Utility Layer" {
+    class CustomAppException <<src/utils/exceptions/custom_exception.py>>{
+        +message: str
+        +code: str
+        +status_code: int
+        +errors: List[Error]
+        --
+        +to_api_response(): APIResponse
+        +from_errors(): CustomAppException
+    }
+
+    class HttpStatusCode <<src/utils/constants/http_status.py>>{
+        +OK: int
+        +CREATED: int
+        +NO_CONTENT
+        +BAD_REQUEST: int
+        +UNAUTHORIZED: int
+        +FORBIDDEN: int
+        +NOT_FOUND: int
+        +CONFLICT: int
+        +UNPROCESSABLE_ENTITY: int
+        +INTERNAL_SERVER_ERROR: int
+        +SERVICE_UNAVAILABLE: int
+    }
+
+    class ErrorCode <<src/utils/constants/error_codes.py>>{
+        +MISSING_ENV_VARS : str
+        +NO_ROWS_AFFECTED : str
+        +CONFLICT :str
+        +INVALID_JSON_FORMAT : str
+        +VALIDATION_ERROR :str
+        +MISSING_HEADERS : str
+        +MISSING_AUTHORIZATION_HEADER : str
+        +INVALID_AUTHORIZATION_HEADER : str
+        +EMPTY_AUTHORIZATION_HEADER : str
+        +MISSING_REQUESTER_ID_HEADER : str
+        +INVALID_REQUESTER_ID_HEADER : str
+        +EMPTY_REQUESTER_ID_HEADER : str
+        +INTERNAL_SERVER_ERROR : str
+        +DATABASE_ERROR : str
+        +SERIALIZE_EVENT_DATA : str
+        +COMMIT_TRANSACTION : str
+        +EXTERNAL_API_FAILED: str
+        +UNAUTHORIZED : str
+    }
+    class GuardrilsService <<src/utils/guardrils.py>>{
+        +llm_guardrils(user_query) -> QuardrilsResponse
+    }
+    class Bedrock <<src/utils/bedrock_client.py>>{
+        +get_bedrock_client()
+    }
+    class Llm <<src/utils/llm_client.py>>{
+        -bedrock : Bedrock
+        +get_llm(max_tokens = 500, temperature = 0.2)
+    }
+
+
+}
+Llm --> Bedrock : calls
+
+package "Agent layer"{
+    class MainAgent<<src/agents/main_agent.py>>{
+
+        -prompt: MainSystemPrompt
+        -llm: Llm
+        +main_agent(self,request:QuizAgentRequest ) ->ReviewAgentResponse
+        +get_llm()
+        +get_system_prompt()
+
+
+        ' +streaming()
+    }
+    class QuizAgent<<src/agents/quiz_run_agent.py>>{
+        -llm: Llm
+        +get_llm()
+    }
+    class ReviewAgent<<src/agents/review_run_agent.py>>{
+        -llm: Llm
+        +get_llm()
+    }
+
+
+    class MainSystemPrompt<<src/agents/Main_prompt.py>>{
+        +get_system_prompt()
+    }
+    class RouteByStepMiddleware<<src/agents/middlware.py>>{
+        +awrap_model_call()
+    }
+    class AgentState<<src/agents/middlware.py>>{
+           +current_step: List
+            +user_query: str
+            +user_id: str
+            +questions: List
+            +user_answers: List
+    }
+
+
+}
+package "Tool layer"{
+
+
+     class QuizAgentTool<<src/tools/ quiz_agent.py>>{
+
+        -prompt: QuizSystemPrompt
+
+
+        +quiz_agent(self,request: QuizAgentRequest ) -> QuizAgentResponse
+
+        +get_system_prompt()
+    }
+    class ReviewAgentTool<<src/tools/ review_agent.py>>{
+
+        -prompt: ReviewSystemPrompt
+
+
+        +review_agent(self,request: reviewAgentRequest ) -> ReviewAgentResponse
+
+        +get_system_prompt()
+    }
+
+
+    class QuizSystemPrompt<<src/tools/quiz_prompt.py>>{
+        +get_system_prompt()
+    }
+    class ReviewSystemPrompt<<src/tools/review_prompt.py>>{
+        +get_system_prompt()
+    }
+
+}
+
+
+MainAgent --> MainSystemPrompt :calls
+QuizAgentTool --> QuizSystemPrompt :calls
+ReviewAgentTool --> ReviewSystemPrompt : calls
+
+MainAgent --> Llm :calls
+QuizAgentTool --> QuizAgent :calls
+ReviewAgentTool --> ReviewAgent : calls
+QuizAgent --> Llm :calls
+ReviewAgent --> Llm : calls
+
+package "Models" {
+    class Error  <<src/models/api_response_dto.py>>{
+        +code: int
+        +message: str
+        --
+        +to_dict(): dict
+
+    }
+    class APIResponse <<src/models/api_response_dto.py>>{
+        +data: Optional[Any]
+        +errors: List[Error]
+        +code: int
+        +message: str
+        --
+        +to_dict(): dict
+    }
+    class QuizAgentRequest <<src/models/request_dto.py>>{
+        +user_id: str
+        +user_query: str
+    }
+    class QuizQuestion <<src/models/request_dto.py>>{
+        +question: str
+        +options: List[str]
+        +correct_answer : str
+    }
+    class QuizAgentResponse <<src/models/request_dto.py>>{
+        +thread_id: str
+         +questions: List[QuizQuestion]
+
+    }
+    class ReviewAgentRequest <<src/models/request_dto.py>>{
+        +user_id: str
+        +questions: List[QuizQuestion]
+        +user_answers: List[str]
+    }
+     class WrongAnswerExplanation <<src/models/request_dto.py>>{
+        +question: str
+        +user_answer: str
+        +correct_answer: str
+        +explanation: str
+    }
+
+     class ReviewAgentResponse <<src/models/request_dto.py>>{
+        +correct_count : int
+        +wrong_count: int
+        +grade: str
+        +wrong_explanations: List[WrongAnswerExplanation]
+        +feedback: str
+        +thread_id: str
+    }
+
+    class QuardrilsResponse<<src/models/request_dto.py>>{
+        +continue_ : int
+        +message : Optional[str] = None
+
+    }
+
+
+
+
+
+}
+
+FastAPI --> APIRouter :calls
+
+' Route → Service
+APIRouter --> AgentService : calls
+
+' Service → agent
+AgentService --> MainAgent: calls
+MainAgent --> RouteByStepMiddleware: calls
+RouteByStepMiddleware --> QuizAgentTool
+RouteByStepMiddleware --> ReviewAgentTool
+MainAgent --> QuizAgentTool: calls
+QuizAgentTool --> ReviewAgentTool: calls
+
+
+MainAgent --> ReviewAgentResponse: returns
+QuizAgentTool --> QuizAgentRequest: uses
+QuizAgentTool --> QuizAgentResponse: returns
+MainAgent --> AgentState: stores
+QuizAgentTool --> AgentState: stores
+ReviewAgentTool --> AgentState: stores
+ReviewAgentTool --> ReviewAgentRequest: uses
+ReviewAgentResponse --> WrongAnswerExplanation
+
+
+MainAgent ..> CustomAppException : may raise
+QuizAgentTool ..> CustomAppException : may raise
+ReviewAgentTool ..> CustomAppException : may raise
+AgentService..> CustomAppException : may raise
+APIRouter ..> CustomAppException :may raise
+
+
+APIRouter --> QuizAgentRequest : input validation
+CustomAppException --> ErrorCode :uses
+CustomAppException --> HttpStatusCode :uses
+APIResponse --> Error : contains
+CustomAppException --> APIResponse : converts_to
+
+@enduml
